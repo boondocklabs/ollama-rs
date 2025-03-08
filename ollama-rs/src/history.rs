@@ -6,7 +6,7 @@ use crate::generation::chat::ChatMessage;
 ///
 /// This trait provides methods for adding messages to the history and
 /// retrieving the list of messages.
-pub trait ChatHistory {
+pub trait ChatHistory: Send + Sync + 'static {
     /// Adds a chat message to the history.
     ///
     /// # Arguments

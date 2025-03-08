@@ -25,6 +25,10 @@ pub enum OllamaError {
     InternalError(InternalOllamaError),
     #[error("Error in Ollama")]
     Other(String),
+    #[error("Mutex lock poisoned")]
+    MutexPoisoned,
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
 }
 
 /// Represents an internal error within the Ollama service.

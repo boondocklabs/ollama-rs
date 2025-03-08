@@ -1,3 +1,8 @@
+use std::sync::{Arc, Mutex};
+
+use tokio::io::{stdout, AsyncWriteExt};
+use tokio_stream::StreamExt as _;
+
 use crate::{
     generation::{
         chat::{request::ChatMessageRequest, ChatMessage, ChatMessageResponse, MessageRole},
@@ -18,7 +23,7 @@ pub struct Coordinator<C: ChatHistory, T: ToolGroup> {
     model: String,
     ollama: Ollama,
     options: ModelOptions,
-    history: C,
+    history: Arc<Mutex<C>>,
     tools: T,
     debug: bool,
     format: Option<FormatType>,
@@ -41,7 +46,7 @@ impl<C: ChatHistory> Coordinator<C, ()> {
             model,
             ollama,
             options: ModelOptions::default(),
-            history,
+            history: Arc::new(Mutex::new(history)),
             tools: (),
             debug: false,
             format: None,
@@ -67,7 +72,7 @@ impl<C: ChatHistory, T: ToolGroup> Coordinator<C, T> {
             model,
             ollama,
             options: ModelOptions::default(),
-            history,
+            history: Arc::new(Mutex::new(history)),
             tools,
             debug: false,
             format: None,
@@ -87,6 +92,11 @@ impl<C: ChatHistory, T: ToolGroup> Coordinator<C, T> {
     pub fn debug(mut self, debug: bool) -> Self {
         self.debug = debug;
         self
+    }
+
+    /// Get a handle to the history
+    pub fn history(&self) -> Arc<Mutex<C>> {
+        self.history.clone()
     }
 
     pub async fn chat(
@@ -114,18 +124,47 @@ impl<C: ChatHistory, T: ToolGroup> Coordinator<C, T> {
             // is set on the first request.
             if tools.is_empty() {
                 request = request.format(format.clone());
-            } else if let Some(last_message) = self.history.messages().last() {
+            } else if let Some(last_message) = self
+                .history
+                .lock()
+                .map_err(|_| crate::error::OllamaError::MutexPoisoned)?
+                .messages()
+                .last()
+            {
                 if last_message.role == MessageRole::Tool {
                     request = request.format(format.clone());
                 }
             }
         }
 
+        let mut stream = self
+            .ollama
+            .send_chat_messages_with_history_stream(self.history.clone(), request)
+            .await?;
+
+        let mut response = String::new();
+        while let Some(Ok(res)) = stream.next().await {
+            stdout().write_all(res.message.content.as_bytes()).await?;
+            stdout().flush().await?;
+            response += res.message.content.as_str();
+        }
+
+        Ok(ChatMessageResponse {
+            model: self.model.clone(),
+            created_at: String::default(),
+            message: ChatMessage::assistant(response),
+            done: true,
+            final_data: None,
+        })
+
+        /*
         let resp = self
             .ollama
             .send_chat_messages_with_history(&mut self.history, request)
             .await?;
+        */
 
+        /*
         if !resp.message.tool_calls.is_empty() {
             for call in resp.message.tool_calls {
                 if self.debug {
@@ -153,5 +192,6 @@ impl<C: ChatHistory, T: ToolGroup> Coordinator<C, T> {
 
             Ok(resp)
         }
+        */
     }
 }

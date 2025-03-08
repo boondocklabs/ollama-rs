@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use tracing::debug;
 
 use crate::{error::OllamaError, history::ChatHistory, Ollama};
 pub mod request;
@@ -33,9 +34,12 @@ impl Ollama {
         request.stream = true;
 
         let url = format!("{}api/chat", self.url_str());
-        let serialized = serde_json::to_string(&request)
+        let serialized = serde_json::to_string_pretty(&request)
             .map_err(|e| e.to_string())
             .unwrap();
+
+        debug!("Request:\n{serialized}");
+
         let builder = self.reqwest_client.post(url);
 
         #[cfg(feature = "headers")]
@@ -79,8 +83,10 @@ impl Ollama {
         request.stream = false;
 
         let url = format!("{}api/chat", self.url_str());
-        let serialized = serde_json::to_string(&request)?;
+        let serialized = serde_json::to_string_pretty(&request)?;
         let builder = self.reqwest_client.post(url);
+
+        debug!("Ollama Request:\n {serialized}");
 
         #[cfg(feature = "headers")]
         let builder = builder.headers(self.request_headers.clone());
