@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 use tracing::debug;
 
 use crate::{error::OllamaError, history::ChatHistory, Ollama};
@@ -253,9 +253,13 @@ impl ChatMessage {
         }
         self
     }
+
+    pub fn custom(role: impl Into<String>, content: impl Into<String>) -> Self {
+        Self::new(MessageRole::Custom(role.into()), content.into())
+    }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub enum MessageRole {
     #[serde(rename = "user")]
     User,
@@ -265,4 +269,20 @@ pub enum MessageRole {
     System,
     #[serde(rename = "tool")]
     Tool,
+    Custom(String),
+}
+
+impl Serialize for MessageRole {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            MessageRole::User => serializer.serialize_str("user"),
+            MessageRole::Assistant => serializer.serialize_str("assistant"),
+            MessageRole::System => serializer.serialize_str("system"),
+            MessageRole::Tool => serializer.serialize_str("tool"),
+            MessageRole::Custom(role) => serializer.serialize_str(&role.to_lowercase()),
+        }
+    }
 }

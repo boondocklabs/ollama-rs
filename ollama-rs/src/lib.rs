@@ -14,6 +14,9 @@ pub mod headers;
 pub mod history;
 pub mod models;
 
+#[cfg(feature = "middleware")]
+mod middleware;
+
 /// A trait to try to convert some type into a [`Url`].
 ///
 /// This trait is "sealed", such that only types within ollama-rs can
@@ -83,7 +86,10 @@ impl IntoUrlSealed for String {
 #[derive(Debug, Clone)]
 pub struct Ollama {
     pub(crate) url: Url,
+    #[cfg(not(feature = "middleware"))]
     pub(crate) reqwest_client: reqwest::Client,
+    #[cfg(feature = "middleware")]
+    pub(crate) reqwest_client: reqwest_middleware::ClientWithMiddleware,
     #[cfg(feature = "headers")]
     pub(crate) request_headers: reqwest::header::HeaderMap,
 }
@@ -137,6 +143,9 @@ impl Ollama {
     pub fn new_with_client(host: impl IntoUrl, port: u16, reqwest_client: reqwest::Client) -> Self {
         let mut url: Url = host.into_url().unwrap();
         url.set_port(Some(port)).unwrap();
+
+        #[cfg(feature = "middleware")]
+        let reqwest_client = Self::create_middleware(reqwest_client);
 
         Self {
             url,
@@ -201,6 +210,13 @@ impl Ollama {
     pub fn url_str(&self) -> &str {
         self.url.as_str()
     }
+
+    #[cfg(feature = "middleware")]
+    fn create_middleware(client: reqwest::Client) -> reqwest_middleware::ClientWithMiddleware {
+        reqwest_middleware::ClientBuilder::new(client)
+            .with(middleware::LoggingMiddleware)
+            .build()
+    }
 }
 
 impl From<Url> for Ollama {
@@ -214,7 +230,10 @@ impl Default for Ollama {
     fn default() -> Self {
         Self {
             url: Url::parse("http://127.0.0.1:11434").unwrap(),
+            #[cfg(not(feature = "middleware"))]
             reqwest_client: reqwest::Client::new(),
+            #[cfg(feature = "middleware")]
+            reqwest_client: Ollama::create_middleware(reqwest::Client::new()),
             #[cfg(feature = "headers")]
             request_headers: reqwest::header::HeaderMap::new(),
         }

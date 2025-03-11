@@ -21,6 +21,9 @@ pub enum OllamaError {
     JsonError(#[from] serde_json::Error),
     #[error("Reqwest error")]
     ReqwestError(#[from] reqwest::Error),
+    #[cfg(feature = "middleware")]
+    #[error("Reqwest Middleware error")]
+    ReqwestMiddlewareError(#[from] reqwest_middleware::Error),
     #[error("Internal Ollama error")]
     InternalError(InternalOllamaError),
     #[error("Error in Ollama")]
