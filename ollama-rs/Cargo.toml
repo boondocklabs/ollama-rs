@@ -51,7 +51,7 @@ headers = ["http"]
 tool-implementations = ["scraper", "text-splitter", "regex", "calc", "html2md"]
 macros = ["ollama-rs-macros"]
 modelfile = ["dep:modelfile", "dep:serde_with"]
-middleware = ["reqwest-middleware", "async-trait"]
+middleware = ["reqwest-middleware", "async-trait", "http"]
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }
